@@ -4,13 +4,80 @@ import { useEffect, useRef, useState } from 'react';
 
 const portfolioData: Record<string, string> = {
   about:
-    'Halo! Saya adalah Software Engineer yang berfokus pada Backend & Microservices.\nSaya suka membangun sistem yang scalable dan menyelesaikan masalah kompleks.',
+    'Nur Arifin — Backend Engineer, Jakarta.\n' +
+    '3+ tahun membangun API, pipeline data, dan worker yang berjalan terus.\n' +
+    '\n' +
+    'Sekarang: Senior Backend Engineer, PT Transportasi Jakarta (Agu 2025–sekarang).\n' +
+    'API operasional bus, GPS, Passenger Information System (PIS), dan pembersihan data.\n' +
+    '\n' +
+    'Sebelumnya: Lenna.ai / PT Sinergi Digital Teknologi (Jan 2022–Agu 2025).\n' +
+    'Backend Engineer, lalu Senior. Integrasi API untuk bank dan perusahaan.\n' +
+    '\n' +
+    'S1 Informatika, Universitas Nasional Jakarta (2018–2022), IPK 3.85.',
   skills:
-    '- Bahasa: Go, Python, JavaScript\n- Database: PostgreSQL, Redis, MongoDB\n- Infrastruktur: Docker, Kubernetes, Linux, AWS\n- Arsitektur: Microservices, RESTful API, gRPC',
+    'Bahasa\n' +
+    '  Go, PHP, JavaScript, SQL\n' +
+    '\n' +
+    'Backend & data\n' +
+    '  REST API, PostgreSQL, Redis, RabbitMQ, MQTT, Apache Airflow\n' +
+    '\n' +
+    'Infra\n' +
+    '  Docker, CI/CD, AWS, Linux, Grafana\n' +
+    '\n' +
+    'Yang sering dikerjakan\n' +
+    '  Worker dan antrian pesan, ETL, optimasi query, migrasi skema, integrasi sistem luar',
   projects:
-    '1. [Sistem GPS Tracking] - Backend realtime menggunakan Go & WebSockets.\n2. [Data Pipeline] - Ekstraksi dan transformasi data jutaan baris per hari.\n3. [E-Commerce API] - Microservices berbasis event-driven architecture.',
+    'TRANSJAKARTA\n' +
+    'Dari commit GitLab, Agu 2025–sekarang.\n' +
+    '\n' +
+    '1. API operasional bus (Go, PostgreSQL)\n' +
+    '   Master data operator dan kuota bus, KM baku, rostering pramudi,\n' +
+    '   jadwal (timetable lite), hak akses, dan export.\n' +
+    '   Riwayat ubah harian ikut tersimpan; generate jadwal lewat MQTT.\n' +
+    '\n' +
+    '2. Pipeline GPS (Apache Airflow)\n' +
+    '   Monitoring GPS, riwayat perjalanan, dan downtime per bus serta delivery order.\n' +
+    '   Proses GPS dan travel history turun dari 5–6 menit menjadi 10–20 detik.\n' +
+    '   Delay GPS memakai rata-rata berbobot dari timestamp perangkat, dengan jadwal GTFS\n' +
+    '   sebagai acuan kalau data perangkat kosong.\n' +
+    '\n' +
+    '3. PIS — info kedatangan penumpang\n' +
+    '   Worker Go dan cron API untuk halte serta gate.\n' +
+    '   MQTT untuk data masuk, RabbitMQ untuk antrian, Redis untuk cache.\n' +
+    '   Duplikat kedatangan dibereskan; tiap gate/halte memetakan bus yang unik.\n' +
+    '   ETA kumulatif yang negatif disaring sebelum tayang.\n' +
+    '\n' +
+    '4. Listener delivery order\n' +
+    '   Status keterlambatan DO, simpan ke Redis, publish MQTT,\n' +
+    '   dan kirim notifikasi operasional. Dashboard memantau DO baru dan delay anomali.\n' +
+    '\n' +
+    '5. Generator jadwal\n' +
+    '   Generate bulanan dan ubah harian: alokasi bus, preview, publish per halte,\n' +
+    '   plus bus yang dibawa ke slot berikutnya.\n' +
+    '\n' +
+    '6. Migrasi database\n' +
+    '   Skema PostgreSQL untuk jadwal, KM baku, kuota operator, dan index.\n' +
+    '\n' +
+    'LENNA.AI\n' +
+    'Jan 2022–Agu 2025. Klien antara lain BNI, Mega Insurance, dan Bank Indonesia.\n' +
+    '\n' +
+    'Yang dibangun:\n' +
+    '  Integrasi 10+ API, alur komplain mesin EDC, dan chatbot.\n' +
+    '  Response time backend sempat membaik sampai sekitar 20%.\n' +
+    '  Deploy lewat Docker dan CI/CD di AWS.\n' +
+    '\n' +
+    'Sistem bank yang didampingi (requirement, monitoring, atau change request):\n' +
+    '  BI-FAST wholesale (single dan bulk), mesin setor tunai, credit underwriting,\n' +
+    '  cek mundur, dan dealer lintas mata uang MYR.\n' +
+    '  Pelaporan: LLD, SLIK OJK, BI Checking, Antasena, penyesuaian NPWP,\n' +
+    '  dan scrubbing data SID.\n' +
+    '\n' +
+    'Proyek lain, 2023:\n' +
+    '  Dashboard kinerja Kota Palopo (Svelte, Rust, Docker, PostgreSQL).\n' +
+    '  Digitalisasi tambang: hitung aktivitas alat berat dari video.\n' +
+    '  CCTV smart city DKI: banjir, genangan, PKL, kerumunan, dan lalu lintas.',
   contact:
-    'Email   : engineer@contoh.com\nLinkedIn: linkedin.com/in/contoh\nGitHub  : github.com/contoh',
+    'Email    : arifingdr@gmail.com\nLinkedIn : linkedin.com/in/nur-arivin\nWeb      : arifinportfolio.my.id',
 };
 
 const bootSequence = [
