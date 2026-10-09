@@ -74,12 +74,7 @@ const terminalCss = `
     padding: 14px;
     font-size: 16px;
   }
-  .terminal-input {
-    flex-wrap: wrap;
-  }
   .terminal-field {
-    flex: 1 1 8rem;
-    min-width: 0;
     font-size: 16px;
   }
 }
@@ -92,15 +87,20 @@ const terminalCss = `
 .terminal-input {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   margin-top: 10px;
 }
 .terminal-prompt {
+  flex: none;
   margin-right: 8px;
   font-weight: 700;
   color: #00ff00;
+  white-space: nowrap;
 }
 .terminal-field {
-  width: 100%;
+  flex: 1;
+  width: auto;
+  min-width: 0;
   border: none;
   outline: none;
   background: transparent;
@@ -220,7 +220,7 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
           if (line.kind === 'command') {
             return (
               <div key={line.id} className="terminal-line">
-                <span className="terminal-prompt">visitor@portfolio:~$</span> {line.value}
+                <span className="terminal-prompt">visitor@arifin-portfolio:~$</span> {line.value}
               </div>
             );
           }
@@ -256,7 +256,7 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
           input.value = '';
         }}
       >
-        <span className="terminal-prompt">visitor@portfolio:~$</span>
+        <span className="terminal-prompt">visitor@arifin-portfolio:~$</span>
         <input
           ref={inputRef}
           className="terminal-field"
