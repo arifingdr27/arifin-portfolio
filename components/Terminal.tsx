@@ -24,58 +24,143 @@ const portfolioData: Record<string, string> = {
     'Infra\n' +
     '  Docker, CI/CD, AWS, Linux, Grafana\n' +
     '\n' +
+    'Frontend\n' +
+    '  React, Redux, Vite, Tailwind CSS\n' +
+    '\n' +
+    'AI\n' +
+    '  Gemini, Groq\n' +
+    '\n' +
     'Yang sering dikerjakan\n' +
     '  Worker dan antrian pesan, ETL, optimasi query, migrasi skema, integrasi sistem luar',
   projects:
+    '--------------------------------\n' +
     'TRANSJAKARTA\n' +
-    'Dari commit GitLab, Agu 2025–sekarang.\n' +
+    'Agustus 2025–sekarang. Sistem di belakang operasional bus.\n' +
     '\n' +
-    '1. API operasional bus (Go, PostgreSQL)\n' +
-    '   Master data operator dan kuota bus, KM baku, rostering pramudi,\n' +
-    '   jadwal (timetable lite), hak akses, dan export.\n' +
-    '   Riwayat ubah harian ikut tersimpan; generate jadwal lewat MQTT.\n' +
+    '1. Data operasional bus\n' +
+    '   Data perusahaan operator, jatah jumlah bus, jarak tempuh standar tiap rute,\n' +
+    '   jadwal kerja sopir, dan jadwal perjalanan.\n' +
+    '   Siapa yang boleh mengubah data diatur, dan datanya bisa diunduh.\n' +
+    '   Perubahan jadwal harian tersimpan. Perintah membuat jadwal dikirim langsung ke sistem lain.\n' +
+    '   Masalah: rute yang sama tersimpan dobel, jadwal harian bentrok dengan yang sudah tayang,\n' +
+    '   dan tidak semua orang boleh mengubah data sopir.\n' +
     '\n' +
-    '2. Pipeline GPS (Apache Airflow)\n' +
-    '   Monitoring GPS, riwayat perjalanan, dan downtime per bus serta delivery order.\n' +
-    '   Proses GPS dan travel history turun dari 5–6 menit menjadi 10–20 detik.\n' +
-    '   Delay GPS memakai rata-rata berbobot dari timestamp perangkat, dengan jadwal GTFS\n' +
-    '   sebagai acuan kalau data perangkat kosong.\n' +
+    '2. Pengolahan lokasi bus\n' +
+    '   Lokasi bus, riwayat perjalanan, dan lama bus tidak mengirim sinyal\n' +
+    '   diolah otomatis per bus dan per surat tugas hari itu.\n' +
+    '   Waktu olah turun dari 5–6 menit menjadi 10–20 detik.\n' +
+    '   Keterlambatan dihitung dari rata-rata waktu di perangkat GPS.\n' +
+    '   Kalau sinyal kosong, yang dipakai adalah jadwal resmi perjalanan.\n' +
+    '   Masalah: lokasi baru selesai diolah setelah 5–6 menit, dan banyak bus yang sinyalnya putus\n' +
+    '   sehingga keterlambatan tidak bisa dihitung dari perangkat saja.\n' +
     '\n' +
-    '3. PIS — info kedatangan penumpang\n' +
-    '   Worker Go dan cron API untuk halte serta gate.\n' +
-    '   MQTT untuk data masuk, RabbitMQ untuk antrian, Redis untuk cache.\n' +
-    '   Duplikat kedatangan dibereskan; tiap gate/halte memetakan bus yang unik.\n' +
-    '   ETA kumulatif yang negatif disaring sebelum tayang.\n' +
+    '3. Layar info penumpang di halte\n' +
+    '   Menyiapkan bus yang akan tiba di tiap halte dan pintu halte.\n' +
+    '   Data masuk langsung, antrian pesan menjaga proses tetap teratur,\n' +
+    '   dan hasil sementaranya disimpan supaya cepat dibaca.\n' +
+    '   Kedatangan yang dobel dibereskan, jadi tiap halte menampilkan bus yang benar.\n' +
+    '   Perkiraan waktu tiba yang tidak masuk akal tidak ditampilkan.\n' +
+    '   Masalah: satu bus muncul dua kali di layar halte, dan perkiraan tiba kadang minus\n' +
+    '   sehingga penumpang melihat info yang salah.\n' +
     '\n' +
-    '4. Listener delivery order\n' +
-    '   Status keterlambatan DO, simpan ke Redis, publish MQTT,\n' +
-    '   dan kirim notifikasi operasional. Dashboard memantau DO baru dan delay anomali.\n' +
+    '4. Pemantau surat tugas bus\n' +
+    '   Memantau surat tugas baru: bus tepat waktu atau terlambat,\n' +
+    '   lalu mengirim kabar ke tim operasional.\n' +
+    '   Layar pantau menampilkan surat tugas baru dan keterlambatan yang tidak wajar.\n' +
+    '   Masalah: surat tugas baru kadang tidak ikut terbarui di layar,\n' +
+    '   dan keterlambatan kecil bercampur dengan yang benar-benar bermasalah.\n' +
     '\n' +
-    '5. Generator jadwal\n' +
-    '   Generate bulanan dan ubah harian: alokasi bus, preview, publish per halte,\n' +
-    '   plus bus yang dibawa ke slot berikutnya.\n' +
+    '5. Pembuat jadwal bus\n' +
+    '   Menyusun jadwal sebulan dan perubahan harian.\n' +
+    '   Bus dibagi per halte, bisa dicek dulu sebelum ditayangkan,\n' +
+    '   termasuk bus yang lanjut ke jadwal berikutnya.\n' +
+    '   Masalah: jumlah bus tidak selalu cukup. Bus dari jadwal sebelumnya bisa menempati slot biasa,\n' +
+    '   dan perubahan harian berisiko menimpa jadwal yang sudah ditayangkan.\n' +
     '\n' +
-    '6. Migrasi database\n' +
-    '   Skema PostgreSQL untuk jadwal, KM baku, kuota operator, dan index.\n' +
+    '6. Penataan penyimpanan data\n' +
+    '   Data jadwal, jarak tempuh, dan jatah bus operator ditata\n' +
+    '   supaya tidak dobel, rapi, dan cepat dicari.\n' +
+    '   Masalah: data lama sudah ada yang dobel. Kalau aturan baru dipasang langsung,\n' +
+    '   penyimpanan gagal dan sistem tidak bisa jalan.\n' +
     '\n' +
+    '--------------------------------\n' +
     'LENNA.AI\n' +
-    'Jan 2022–Agu 2025. Klien antara lain BNI, Mega Insurance, dan Bank Indonesia.\n' +
+    'Januari 2022–Agustus 2025.\n' +
+    'Klien antara lain BNI, Mega Insurance, dan Bank Indonesia.\n' +
     '\n' +
     'Yang dibangun:\n' +
-    '  Integrasi 10+ API, alur komplain mesin EDC, dan chatbot.\n' +
-    '  Response time backend sempat membaik sampai sekitar 20%.\n' +
-    '  Deploy lewat Docker dan CI/CD di AWS.\n' +
+    '1. Sambungan lebih dari 10 sistem, supaya alur kerja klien berjalan otomatis.\n' +
+    '   Masalah: tiap sistem bank punya cara kirim data sendiri. Satu sambungan putus, proses klien ikut berhenti.\n' +
+    '2. Alur komplain mesin gesek kartu (EDC).\n' +
+    '   Masalah: laporan kerusakan masuk tercecer, sulit dilacak sampai benar-benar selesai.\n' +
+    '3. Chatbot agar balasan ke pengguna lebih cepat.\n' +
+    '   Masalah: pengguna menunggu jawaban, sementara petugas tidak sanggup membalas satu per satu.\n' +
+    '4. Waktu respons sistem sempat lebih cepat sampai sekitar 20%.\n' +
+    '   Masalah: sistem terasa lambat saat banyak permintaan masuk bersamaan.\n' +
+    '5. Rilis aplikasi otomatis ke server Amazon (AWS).\n' +
+    '   Masalah: rilis manual mudah keliru dan lama, padahal klien butuh perbaikan cepat.\n' +
     '\n' +
-    'Sistem bank yang didampingi (requirement, monitoring, atau change request):\n' +
-    '  BI-FAST wholesale (single dan bulk), mesin setor tunai, credit underwriting,\n' +
-    '  cek mundur, dan dealer lintas mata uang MYR.\n' +
-    '  Pelaporan: LLD, SLIK OJK, BI Checking, Antasena, penyesuaian NPWP,\n' +
-    '  dan scrubbing data SID.\n' +
+    'Sistem bank yang didampingi (kebutuhan, pantauan, atau permintaan perubahan):\n' +
+    '1. Transfer cepat antarbank (BI-FAST) untuk nasabah bisnis, satuan maupun massal.\n' +
+    '   Masalah: transfer bisnis harus cepat dan tepat, baik satu transaksi maupun ribuan sekaligus.\n' +
+    '2. Mesin setor tunai.\n' +
+    '   Masalah: setoran di mesin harus masuk ke pembukuan bank tanpa selisih.\n' +
+    '3. Penilaian layak tidaknya pengajuan kredit.\n' +
+    '   Masalah: aturan kelayakan kredit berubah, dan keputusan tidak boleh meleset.\n' +
+    '4. Cek yang baru bisa dicairkan di tanggal nanti.\n' +
+    '   Masalah: cek mudah dicairkan lebih awal kalau tanggal berlakunya tidak dijaga.\n' +
+    '5. Dealer mata uang ringgit Malaysia.\n' +
+    '   Masalah: kebutuhan dan batas waktu proyek harus selaras dengan sistem perbankan yang sudah jalan.\n' +
+    '6. Laporan lalu lintas devisa.\n' +
+    '   Masalah: aturan devisa baru, laporan lama tidak lagi diterima pengawas.\n' +
+    '7. Laporan riwayat kredit ke OJK (SLIK).\n' +
+    '   Masalah: laporan harian wajib terus jalan. Sekali macet, kepatuhan ikut terganggu.\n' +
+    '8. Pengecekan riwayat kredit ke Bank Indonesia.\n' +
+    '   Masalah: pengecekan harian sering error, dan kesalahan kecil berdampak ke keputusan kredit.\n' +
+    '9. Pelaporan bank ke Bank Indonesia (Antasena).\n' +
+    '   Masalah: format laporan pengawas berubah, sistem lama tidak langsung ikut berubah.\n' +
+    '10. Penyesuaian nomor NPWP.\n' +
+    '    Masalah: format NPWP baru membuat data nasabah lama tidak lagi cocok.\n' +
+    '11. Pembersihan data debitur supaya tetap akurat.\n' +
+    '    Masalah: data debitur kotor menumpuk tiap bulan dan ikut merusak laporan.\n' +
     '\n' +
     'Proyek lain, 2023:\n' +
-    '  Dashboard kinerja Kota Palopo (Svelte, Rust, Docker, PostgreSQL).\n' +
-    '  Digitalisasi tambang: hitung aktivitas alat berat dari video.\n' +
-    '  CCTV smart city DKI: banjir, genangan, PKL, kerumunan, dan lalu lintas.',
+    '1. Dashboard kinerja Kota Palopo: satu layar berisi grafik data kota.\n' +
+    '   Masalah: data dinas tercecer di banyak tempat, pimpinan tidak bisa melihat satu gambaran.\n' +
+    '2. Digitalisasi tambang: hitung aktivitas alat berat dari rekaman video.\n' +
+    '   Masalah: aktivitas ekskavator dan dumptruck sulit dihitung manual dari lapangan.\n' +
+    '3. CCTV kota DKI: peringatan banjir, genangan, pedagang kaki lima, kerumunan, dan lalu lintas.\n' +
+    '   Masalah: kamera banyak, tetapi peringatan ke dinas tetap lambat dan terpisah-pisah.\n' +
+    '\n' +
+    '--------------------------------\n' +
+    'SPLITBILL — proyek pribadi\n' +
+    'https://splitbill.nrarivin.online\n' +
+    '\n' +
+    'Aplikasi bagi tagihan dari foto struk: siapa pesan apa, dan berapa yang harus dibayar.\n' +
+    'Login Google, unggah atau foto struk, lalu AI membaca item, pajak, biaya lain, dan total.\n' +
+    'Hasil bisa dikoreksi. Item dibagi ke teman, termasuk barang patungan seperti kantong atau ongkir.\n' +
+    'Sisa pembagian rata; bahasa struk ikut terbaca, jadi layar dan PDF menyesuaikan.\n' +
+    '\n' +
+    'Masalah:\n' +
+    '1. Foto struk sering buram, dan harga bisa terbaca salah, misalnya kurang atau lebih tiga nol.\n' +
+    '2. AI utama kadang lambat atau gagal, padahal pengguna sedang menunggu hasil.\n' +
+    '3. Pemakaian AI berbayar. Tanpa batas, biaya model bisa melonjak.\n' +
+    '4. Kantong dan ongkir tidak boleh ditagih ke satu orang, dan sisa rupiah harus habis terbagi.\n' +
+    '\n' +
+    'Backend (Go, Fiber, PostgreSQL)\n' +
+    '  API ekstraksi struk. Gemini dicoba lebih dulu.\n' +
+    '  Groq jalan sebagai cadangan kalau Gemini lambat atau gagal.\n' +
+    '  Login Google ditukar menjadi JWT. Kuota OCR bulanan dan rate limit membatasi pemakaian.\n' +
+    '  Foto struk disimpan di disk server atau Firebase.\n' +
+    '\n' +
+    'Frontend (React, Redux, Tailwind, Vite)\n' +
+    '  Alur: unggah, cek detail, tambah teman, bagi item, selesai, unduh PDF.\n' +
+    '  Di-build lalu di-serve Nginx lewat Docker.\n' +
+    '\n' +
+    'Infra\n' +
+    '  API ikut jaringan Docker shared-infra.\n' +
+    '  Postgres 16 dipakai bersama, datanya di volume, port hanya di localhost.\n' +
+    '  Stack yang sama juga menjalankan Redis dan RabbitMQ untuk aplikasi lain.',
   contact:
     'Email    : arifingdr@gmail.com\nLinkedIn : linkedin.com/in/nur-arivin\nWeb      : arifinportfolio.my.id',
 };
