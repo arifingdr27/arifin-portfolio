@@ -1,69 +1,250 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import Terminal from '@/components/Terminal';
+import Spline from '@splinetool/react-spline';
+import type { Application, SplineEvent } from '@splinetool/runtime';
+
+type ScreenRect = { left: number; top: number; width: number; height: number };
+
+type Mat4 = { elements: ArrayLike<number> };
+
+type Attr = {
+  count: number;
+  getX: (index: number) => number;
+  getY: (index: number) => number;
+  getZ: (index: number) => number;
+};
+
+type SceneMesh = {
+  geometry?: { attributes?: { position?: Attr; normal?: Attr } };
+  matrixWorld: Mat4;
+  updateMatrixWorld?: (force?: boolean) => void;
+  updateWorldMatrix?: (updateParents: boolean, updateChildren: boolean) => void;
+  traverse?: (callback: (object: SceneMesh) => void) => void;
+};
+
+type SplineApp = Application & {
+  _camera?: {
+    matrixWorld: Mat4;
+    matrixWorldInverse: Mat4;
+    projectionMatrix: Mat4;
+    updateMatrixWorld?: (force?: boolean) => void;
+    updateWorldMatrix?: (updateParents: boolean, updateChildren: boolean) => void;
+    updateProjectionMatrix?: () => void;
+  };
+  _scene?: { getObjectByName: (name: string) => SceneMesh | undefined };
+};
+
+function collectMeshes(object: SceneMesh | undefined) {
+  const meshes: SceneMesh[] = [];
+  if (!object) return meshes;
+  const visit = (node: SceneMesh) => {
+    if (node.geometry?.attributes?.position) meshes.push(node);
+  };
+  visit(object);
+  object.traverse?.((node) => {
+    if (node !== object) visit(node);
+  });
+  return meshes;
+}
+
+function fallbackScreenRect(host: HTMLElement): ScreenRect {
+  const width = host.clientWidth;
+  const height = host.clientHeight;
+  return {
+    left: width * 0.285,
+    top: height * 0.18,
+    width: width * 0.47,
+    height: height * 0.55,
+  };
+}
+
+function measureLaptopScreen(spline: SplineApp, host: HTMLElement): ScreenRect | null {
+  const camera = spline._camera;
+  const laptop = spline._scene?.getObjectByName('laptop');
+  if (!camera || !laptop) return null;
+
+  camera.updateMatrixWorld?.(true);
+  camera.updateWorldMatrix?.(true, false);
+  camera.updateProjectionMatrix?.();
+  if (!camera.matrixWorld?.elements || !camera.matrixWorldInverse?.elements || !camera.projectionMatrix?.elements) {
+    return null;
+  }
+
+  const lookX = -camera.matrixWorld.elements[8];
+  const lookY = -camera.matrixWorld.elements[9];
+  const lookZ = -camera.matrixWorld.elements[10];
+  const view = camera.matrixWorldInverse.elements;
+  const proj = camera.projectionMatrix.elements;
+  const canvasRect = spline.canvas.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const points: Array<{ x: number; y: number }> = [];
+
+  for (const mesh of collectMeshes(laptop)) {
+    mesh.updateMatrixWorld?.(true);
+    mesh.updateWorldMatrix?.(true, false);
+    const position = mesh.geometry?.attributes?.position;
+    const normal = mesh.geometry?.attributes?.normal;
+    const world = mesh.matrixWorld.elements;
+    if (!position) continue;
+
+    for (let index = 0; index < position.count; index++) {
+      const x = position.getX(index);
+      const y = position.getY(index);
+      const z = position.getZ(index);
+      const wx = world[0] * x + world[4] * y + world[8] * z + world[12];
+      const wy = world[1] * x + world[5] * y + world[9] * z + world[13];
+      const wz = world[2] * x + world[6] * y + world[10] * z + world[14];
+
+      if (normal) {
+        let nx = world[0] * normal.getX(index) + world[4] * normal.getY(index) + world[8] * normal.getZ(index);
+        let ny = world[1] * normal.getX(index) + world[5] * normal.getY(index) + world[9] * normal.getZ(index);
+        let nz = world[2] * normal.getX(index) + world[6] * normal.getY(index) + world[10] * normal.getZ(index);
+        const length = Math.hypot(nx, ny, nz) || 1;
+        nx /= length;
+        ny /= length;
+        nz /= length;
+        if (nx * lookX + ny * lookY + nz * lookZ > -0.7) continue;
+      }
+
+      const vx = view[0] * wx + view[4] * wy + view[8] * wz + view[12];
+      const vy = view[1] * wx + view[5] * wy + view[9] * wz + view[13];
+      const vz = view[2] * wx + view[6] * wy + view[10] * wz + view[14];
+      const vw = view[3] * wx + view[7] * wy + view[11] * wz + view[15];
+      const cx = proj[0] * vx + proj[4] * vy + proj[8] * vz + proj[12] * vw;
+      const cy = proj[1] * vx + proj[5] * vy + proj[9] * vz + proj[13] * vw;
+      const cw = proj[3] * vx + proj[7] * vy + proj[11] * vz + proj[15] * vw;
+      if (!cw) continue;
+
+      points.push({
+        x: canvasRect.left - hostRect.left + ((cx / cw) * 0.5 + 0.5) * canvasRect.width,
+        y: canvasRect.top - hostRect.top + ((-cy / cw) * 0.5 + 0.5) * canvasRect.height,
+      });
+    }
+  }
+
+  if (points.length < 4) return null;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minY = Math.min(minY, point.y);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  const width = maxX - minX;
+  const sidePoints = points.filter((point) => point.x < minX + width * 0.18 || point.x > maxX - width * 0.18);
+  const frameTop = Math.min(...sidePoints.map((point) => point.y));
+  const frameBottom = Math.max(...sidePoints.map((point) => point.y));
+  const frameHeight = frameBottom - frameTop;
+  if (width < 40 || frameHeight < 40) return null;
+
+  // Front-facing bounds are the screen image, not the cyan bezel.
+  return { left: minX, top: frameTop, width, height: frameHeight };
+}
 
 export default function Home() {
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [screenRect, setScreenRect] = useState<ScreenRect | null>(null);
+  const isZoomedRef = useRef(false);
+  const splineRef = useRef<SplineApp | null>(null);
+  const hostRef = useRef<HTMLElement>(null);
+  const frameRef = useRef(0);
+  const openTimerRef = useRef(0);
+
+  function updateScreenRect() {
+    const spline = splineRef.current;
+    const host = hostRef.current;
+    if (!spline || !host) return;
+    const next = measureLaptopScreen(spline, host) ?? fallbackScreenRect(host);
+    const fitted =
+      next.width > host.clientWidth * 0.2 && next.width < host.clientWidth * 0.9 ? next : fallbackScreenRect(host);
+    setScreenRect((current) => {
+      if (
+        current &&
+        Math.abs(current.left - fitted.left) < 0.5 &&
+        Math.abs(current.top - fitted.top) < 0.5 &&
+        Math.abs(current.width - fitted.width) < 0.5 &&
+        Math.abs(current.height - fitted.height) < 0.5
+      ) {
+        return current;
+      }
+      return fitted;
+    });
+  }
+
+  function trackScreen() {
+    cancelAnimationFrame(frameRef.current);
+    const loop = () => {
+      updateScreenRect();
+      if (isZoomedRef.current) frameRef.current = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(frameRef.current);
+      window.clearTimeout(openTimerRef.current);
+    },
+    [],
+  );
+
+  function handleSplineMouseDown(e: SplineEvent) {
+    if (e.target.name !== 'laptop') return;
+
+    if (!isZoomedRef.current) {
+      window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = window.setTimeout(() => {
+        isZoomedRef.current = true;
+        setIsZoomed(true);
+        setShowTerminal(true);
+        trackScreen();
+      }, 1500);
+      return;
+    }
+
+    window.clearTimeout(openTimerRef.current);
+    isZoomedRef.current = false;
+    setIsZoomed(false);
+    setShowTerminal(false);
+    cancelAnimationFrame(frameRef.current);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main ref={hostRef} className="relative h-dvh w-full overflow-hidden bg-[#1A1A1A]">
+      <Spline
+        scene="https://prod.spline.design/GM2ro768woK11CoN/scene.splinecode"
+        onLoad={(spline) => {
+          splineRef.current = spline as SplineApp;
+        }}
+        onSplineMouseDown={handleSplineMouseDown}
+      />
+
+      <div
+        className={`terminal-overlay absolute z-10 overflow-hidden transition-opacity duration-500 ${
+          showTerminal ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        style={
+          screenRect
+            ? {
+                left: screenRect.left,
+                top: screenRect.top,
+                width: screenRect.width,
+                height: screenRect.height,
+                borderRadius: Math.min(screenRect.width, screenRect.height) * 0.07,
+              }
+            : { left: 0, top: 0, width: 0, height: 0 }
+        }
+      >
+        <Terminal active={showTerminal} onQuit={() => setShowTerminal(false)} />
+      </div>
+    </main>
   );
 }
