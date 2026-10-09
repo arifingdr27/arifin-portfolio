@@ -162,7 +162,7 @@ const portfolioData: Record<string, string> = {
     '  Postgres 16 dipakai bersama, datanya di volume, port hanya di localhost.\n' +
     '  Stack yang sama juga menjalankan Redis dan RabbitMQ untuk aplikasi lain.',
   contact:
-    'Email    : arifingdr@gmail.com\nLinkedIn : linkedin.com/in/nur-arivin\nWeb      : arifinportfolio.my.id',
+    'Email    : arifingdr@gmail.com\nLinkedIn : linkedin.com/in/nur-arivin\nWeb      : nrarivin.online',
 };
 
 const bootSequence = [
@@ -304,6 +304,42 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
     return () => window.clearTimeout(timer);
   }, []);
 
+  const fitToVisibleArea = useRef(() => {});
+
+  useEffect(() => {
+    const fit = () => {
+      const screen = scrollerRef.current;
+      const viewport = window.visualViewport;
+      if (!screen || !viewport) return;
+      const mobile = window.matchMedia('(max-width: 768px)').matches;
+      if (!mobile) {
+        screen.style.position = '';
+        screen.style.top = '';
+        screen.style.left = '';
+        screen.style.width = '';
+        screen.style.height = '';
+        return;
+      }
+      screen.style.position = 'fixed';
+      screen.style.top = `${viewport.offsetTop}px`;
+      screen.style.left = '0';
+      screen.style.width = '100%';
+      screen.style.height = `${viewport.height}px`;
+      screen.scrollTop = screen.scrollHeight;
+    };
+    fitToVisibleArea.current = fit;
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', fit);
+    viewport?.addEventListener('scroll', fit);
+    window.addEventListener('orientationchange', fit);
+    fit();
+    return () => {
+      viewport?.removeEventListener('resize', fit);
+      viewport?.removeEventListener('scroll', fit);
+      window.removeEventListener('orientationchange', fit);
+    };
+  }, []);
+
   useEffect(() => {
     if (active && ready) inputRef.current?.focus();
   }, [active, ready]);
@@ -311,6 +347,7 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
+    fitToVisibleArea.current();
     scroller.scrollTop = scroller.scrollHeight;
   }, [lines]);
 
@@ -418,6 +455,10 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
           spellCheck={false}
           disabled={!ready}
           aria-label="Perintah terminal"
+          onFocus={() => {
+            window.setTimeout(() => fitToVisibleArea.current(), 50);
+            window.setTimeout(() => fitToVisibleArea.current(), 300);
+          }}
         />
       </form>
     </div>
