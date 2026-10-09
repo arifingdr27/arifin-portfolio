@@ -22,12 +22,14 @@ const bootSequence = [
   ' ',
 ];
 
-type Line =
-  | { id: number; kind: 'text'; text: string }
-  | { id: number; kind: 'hint' }
-  | { id: number; kind: 'command'; value: string }
-  | { id: number; kind: 'help' }
-  | { id: number; kind: 'error'; command: string };
+type LineBody =
+  | { kind: 'text'; text: string }
+  | { kind: 'hint' }
+  | { kind: 'command'; value: string }
+  | { kind: 'help' }
+  | { kind: 'error'; command: string };
+
+type Line = LineBody & { id: number };
 
 const helpItems = [
   ['/help', 'Daftar perintah'],
@@ -126,7 +128,7 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
   const scrollerRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
 
-  function pushLine(line: Omit<Line, 'id'>) {
+  function pushLine(line: LineBody) {
     const id = idRef.current++;
     setLines((current) => [...current, { ...line, id } as Line]);
   }
