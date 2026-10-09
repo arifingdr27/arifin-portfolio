@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Terminal from '@/components/Terminal';
-import Spline from '@splinetool/react-spline';
 import type { Application, SplineEvent } from '@splinetool/runtime';
+
+type SplineComponent = typeof import('@splinetool/react-spline').default;
 
 type ScreenRect = { left: number; top: number; width: number; height: number };
 
@@ -149,7 +150,6 @@ function measureLaptopScreen(spline: SplineApp, host: HTMLElement): ScreenRect |
 }
 
 export default function Home() {
-  const [isZoomed, setIsZoomed] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [screenRect, setScreenRect] = useState<ScreenRect | null>(null);
   const isZoomedRef = useRef(false);
@@ -157,6 +157,27 @@ export default function Home() {
   const hostRef = useRef<HTMLElement>(null);
   const frameRef = useRef(0);
   const openTimerRef = useRef(0);
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+  const [SplineView, setSplineView] = useState<SplineComponent | null>(null);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const apply = () => setIsMobile(media.matches);
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile !== false) return;
+    let cancelled = false;
+    import('@splinetool/react-spline').then((mod) => {
+      if (!cancelled) setSplineView(() => mod.default);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isMobile]);
 
   function updateScreenRect() {
     const spline = splineRef.current;
@@ -203,7 +224,6 @@ export default function Home() {
       window.clearTimeout(openTimerRef.current);
       openTimerRef.current = window.setTimeout(() => {
         isZoomedRef.current = true;
-        setIsZoomed(true);
         setShowTerminal(true);
         trackScreen();
       }, 1500);
@@ -212,20 +232,29 @@ export default function Home() {
 
     window.clearTimeout(openTimerRef.current);
     isZoomedRef.current = false;
-    setIsZoomed(false);
     setShowTerminal(false);
     cancelAnimationFrame(frameRef.current);
   }
 
+  if (isMobile) {
+    return (
+      <main className="h-dvh w-full overflow-hidden bg-[#0a0a0a]">
+        <Terminal active onQuit={() => undefined} />
+      </main>
+    );
+  }
+
   return (
     <main ref={hostRef} className="relative h-dvh w-full overflow-hidden bg-[#1A1A1A]">
-      <Spline
-        scene="https://prod.spline.design/GM2ro768woK11CoN/scene.splinecode"
-        onLoad={(spline) => {
-          splineRef.current = spline as SplineApp;
-        }}
-        onSplineMouseDown={handleSplineMouseDown}
-      />
+      {SplineView && (
+        <SplineView
+          scene="https://prod.spline.design/GM2ro768woK11CoN/scene.splinecode"
+          onLoad={(spline) => {
+            splineRef.current = spline as SplineApp;
+          }}
+          onSplineMouseDown={handleSplineMouseDown}
+        />
+      )}
 
       <div
         className={`terminal-overlay absolute z-10 overflow-hidden transition-opacity duration-500 ${
