@@ -231,7 +231,7 @@ export default function Home() {
   const [sceneReady, setSceneReady] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
   const isZoomedRef = useRef(false);
-  const zoomPhaseRef = useRef<'idle' | 'opening' | 'open'>('idle');
+  const cameraZoomedRef = useRef(false);
   const splineRef = useRef<SplineApp | null>(null);
   const hostRef = useRef<HTMLElement>(null);
   const frameRef = useRef(0);
@@ -301,9 +301,8 @@ export default function Home() {
     [],
   );
 
-  function closeTerminal() {
+  function hideTerminal() {
     window.clearTimeout(openTimerRef.current);
-    zoomPhaseRef.current = 'idle';
     isZoomedRef.current = false;
     setShowTerminal(false);
     cancelAnimationFrame(frameRef.current);
@@ -312,15 +311,15 @@ export default function Home() {
   function handleSplineMouseDown(e: SplineEvent) {
     if (e.target.name !== 'laptop') return;
 
-    if (zoomPhaseRef.current !== 'idle') {
-      closeTerminal();
+    if (cameraZoomedRef.current) {
+      cameraZoomedRef.current = false;
+      hideTerminal();
       return;
     }
 
-    zoomPhaseRef.current = 'opening';
+    cameraZoomedRef.current = true;
     openTimerRef.current = window.setTimeout(() => {
-      if (zoomPhaseRef.current !== 'opening') return;
-      zoomPhaseRef.current = 'open';
+      if (!cameraZoomedRef.current) return;
       isZoomedRef.current = true;
       setShowTerminal(true);
       trackScreen();
@@ -368,7 +367,7 @@ export default function Home() {
                 : { left: 0, top: 0, width: 0, height: 0 }
             }
           >
-            <Terminal active={showTerminal} onQuit={closeTerminal} />
+            <Terminal active={showTerminal} onQuit={hideTerminal} />
           </div>
         </>
       )}
