@@ -236,28 +236,39 @@ const terminalCss = `
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-.terminal-input {
+.terminal-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  gap: 1ch;
+}
+.terminal-input {
   flex-wrap: nowrap;
   margin-top: 10px;
 }
 .terminal-prompt {
   flex: none;
-  margin-right: 8px;
   font-weight: 700;
   color: #00ff00;
   white-space: nowrap;
+}
+.terminal-value {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .terminal-field {
   flex: 1;
   width: auto;
   min-width: 0;
+  margin: 0;
+  padding: 0;
   border: none;
   outline: none;
   background: transparent;
   color: #00ff00;
   font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
   text-shadow: inherit;
 }
 .terminal-accent {
@@ -408,8 +419,9 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
           }
           if (line.kind === 'command') {
             return (
-              <div key={line.id} className="terminal-line">
-                <span className="terminal-prompt">visitor@arifin-portfolio:~$</span> {line.value}
+              <div key={line.id} className="terminal-line terminal-row">
+                <span className="terminal-prompt">visitor@arifin-portfolio:~$</span>
+                <span className="terminal-value">{line.value}</span>
               </div>
             );
           }
@@ -436,7 +448,7 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
         })}
       </div>
       <form
-        className="terminal-input"
+        className="terminal-input terminal-row"
         onSubmit={(event) => {
           event.preventDefault();
           const input = inputRef.current;

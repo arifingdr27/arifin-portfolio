@@ -35,6 +35,7 @@ type SplineApp = Application & {
     updateProjectionMatrix?: () => void;
   };
   _scene?: { getObjectByName: (name: string) => SceneMesh | undefined };
+  _renderer?: { pipeline?: { setWatermark?: (texture: null) => void } };
 };
 
 function collectMeshes(object: SceneMesh | undefined) {
@@ -149,16 +150,99 @@ function measureLaptopScreen(spline: SplineApp, host: HTMLElement): ScreenRect |
   return { left: minX, top: frameTop, width, height: frameHeight };
 }
 
+function BootScreen({ done }: { done: boolean }) {
+  const [progress, setProgress] = useState(0);
+  const [fading, setFading] = useState(false);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    if (done) {
+      setProgress(100);
+      const fade = window.setTimeout(() => setFading(true), 180);
+      const hide = window.setTimeout(() => setHidden(true), 580);
+      return () => {
+        window.clearTimeout(fade);
+        window.clearTimeout(hide);
+      };
+    }
+
+    const start = performance.now();
+    const timer = window.setInterval(() => {
+      const value = 92 * (1 - Math.exp(-(performance.now() - start) / 1400));
+      setProgress(value);
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, [done]);
+
+  if (hidden) return null;
+
+  return (
+    <div
+      aria-live="polite"
+      aria-busy={!done}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 40,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.75rem',
+        background: '#0a0a0a',
+        opacity: fading ? 0 : 1,
+        pointerEvents: fading ? 'none' : 'auto',
+        transition: 'opacity 0.4s ease',
+      }}
+    >
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress)}
+        style={{ width: 'min(16rem, 70vw)', height: 2, background: '#1f1f1f' }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${progress}%`,
+            background: '#00ff00',
+            boxShadow: '0 0 8px #00ff00',
+          }}
+        />
+      </div>
+      <span
+        style={{
+          fontFamily: 'var(--font-geist-mono), ui-monospace, monospace',
+          fontSize: '0.75rem',
+          letterSpacing: '0.08em',
+          color: '#00ff00',
+        }}
+      >
+        {Math.round(progress)}%
+      </span>
+    </div>
+  );
+}
+
 export default function Home() {
   const [showTerminal, setShowTerminal] = useState(false);
   const [screenRect, setScreenRect] = useState<ScreenRect | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [minElapsed, setMinElapsed] = useState(false);
   const isZoomedRef = useRef(false);
+  const zoomPhaseRef = useRef<'idle' | 'opening' | 'open'>('idle');
   const splineRef = useRef<SplineApp | null>(null);
   const hostRef = useRef<HTMLElement>(null);
   const frameRef = useRef(0);
   const openTimerRef = useRef(0);
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [SplineView, setSplineView] = useState<SplineComponent | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMinElapsed(true), 700);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
@@ -217,63 +301,78 @@ export default function Home() {
     [],
   );
 
-  function handleSplineMouseDown(e: SplineEvent) {
-    if (e.target.name !== 'laptop') return;
-
-    if (!isZoomedRef.current) {
-      window.clearTimeout(openTimerRef.current);
-      openTimerRef.current = window.setTimeout(() => {
-        isZoomedRef.current = true;
-        setShowTerminal(true);
-        trackScreen();
-      }, 1500);
-      return;
-    }
-
+  function closeTerminal() {
     window.clearTimeout(openTimerRef.current);
+    zoomPhaseRef.current = 'idle';
     isZoomedRef.current = false;
     setShowTerminal(false);
     cancelAnimationFrame(frameRef.current);
   }
 
-  if (isMobile) {
-    return (
-      <main className="h-dvh w-full overflow-hidden bg-[#0a0a0a]">
-        <Terminal active onQuit={() => undefined} />
-      </main>
-    );
+  function handleSplineMouseDown(e: SplineEvent) {
+    if (e.target.name !== 'laptop') return;
+
+    if (zoomPhaseRef.current !== 'idle') {
+      closeTerminal();
+      return;
+    }
+
+    zoomPhaseRef.current = 'opening';
+    openTimerRef.current = window.setTimeout(() => {
+      if (zoomPhaseRef.current !== 'opening') return;
+      zoomPhaseRef.current = 'open';
+      isZoomedRef.current = true;
+      setShowTerminal(true);
+      trackScreen();
+    }, 1500);
   }
 
-  return (
-    <main ref={hostRef} className="relative h-dvh w-full overflow-hidden bg-[#1A1A1A]">
-      {SplineView && (
-        <SplineView
-          scene="https://prod.spline.design/GM2ro768woK11CoN/scene.splinecode"
-          onLoad={(spline) => {
-            splineRef.current = spline as SplineApp;
-          }}
-          onSplineMouseDown={handleSplineMouseDown}
-        />
-      )}
+  const bootDone = isMobile === true ? minElapsed : minElapsed && sceneReady;
 
-      <div
-        className={`terminal-overlay absolute z-10 overflow-hidden transition-opacity duration-500 ${
-          showTerminal ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        style={
-          screenRect
-            ? {
-                left: screenRect.left,
-                top: screenRect.top,
-                width: screenRect.width,
-                height: screenRect.height,
-                borderRadius: Math.min(screenRect.width, screenRect.height) * 0.07,
-              }
-            : { left: 0, top: 0, width: 0, height: 0 }
-        }
-      >
-        <Terminal active={showTerminal} onQuit={() => setShowTerminal(false)} />
-      </div>
+  return (
+    <main
+      ref={hostRef}
+      className={`relative h-dvh w-full overflow-hidden ${isMobile ? 'bg-[#0a0a0a]' : 'bg-[#1A1A1A]'}`}
+    >
+      {isMobile ? (
+        <Terminal active onQuit={() => undefined} />
+      ) : (
+        <>
+          {SplineView && (
+            <SplineView
+              scene="https://prod.spline.design/GM2ro768woK11CoN/scene.splinecode"
+              onLoad={(spline) => {
+                const app = spline as SplineApp;
+                splineRef.current = app;
+                app._renderer?.pipeline?.setWatermark?.(null);
+                app.requestRender();
+                setSceneReady(true);
+              }}
+              onSplineMouseDown={handleSplineMouseDown}
+            />
+          )}
+
+          <div
+            className={`terminal-overlay absolute z-10 overflow-hidden transition-opacity duration-500 ${
+              showTerminal ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+            style={
+              screenRect
+                ? {
+                    left: screenRect.left,
+                    top: screenRect.top,
+                    width: screenRect.width,
+                    height: screenRect.height,
+                    borderRadius: Math.min(screenRect.width, screenRect.height) * 0.07,
+                  }
+                : { left: 0, top: 0, width: 0, height: 0 }
+            }
+          >
+            <Terminal active={showTerminal} onQuit={closeTerminal} />
+          </div>
+        </>
+      )}
+      <BootScreen done={bootDone} />
     </main>
   );
 }
