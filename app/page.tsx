@@ -37,30 +37,11 @@ type SplineApp = Application & {
   _scene?: { getObjectByName: (name: string) => SceneMesh | undefined };
   _renderer?: { pipeline?: { setWatermark?: (texture: null) => void } };
   _controls?: { orbitControls?: { enableZoom?: boolean } };
-  _eventManager?: {
-    handlers?: {
-      Basic?: {
-        eventsPerObjects?: Record<string, Record<string, Array<{ actions?: { Transition?: unknown[] } }>>>;
-      };
-    };
-  };
 };
 
-function disableSceneZoom(spline: SplineApp) {
+function disableManualCameraZoom(spline: SplineApp) {
   const orbit = spline._controls?.orbitControls;
   if (orbit) orbit.enableZoom = false;
-
-  const groups = spline._eventManager?.handlers?.Basic?.eventsPerObjects;
-  if (!groups) return;
-  for (const type of ['MouseDown', 'MouseUp', 'MousePress']) {
-    const byObject = groups[type];
-    if (!byObject) continue;
-    for (const events of Object.values(byObject)) {
-      for (const event of events) {
-        if (event.actions?.Transition) event.actions.Transition.length = 0;
-      }
-    }
-  }
 }
 
 function collectMeshes(object: SceneMesh | undefined) {
@@ -260,6 +241,7 @@ export default function Home() {
   const splineRef = useRef<SplineApp | null>(null);
   const hostRef = useRef<HTMLElement>(null);
   const frameRef = useRef(0);
+  const openTimerRef = useRef(0);
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [SplineView, setSplineView] = useState<SplineComponent | null>(null);
 
@@ -343,11 +325,13 @@ export default function Home() {
   useEffect(
     () => () => {
       cancelAnimationFrame(frameRef.current);
+      window.clearTimeout(openTimerRef.current);
     },
     [],
   );
 
   function hideTerminal() {
+    window.clearTimeout(openTimerRef.current);
     isZoomedRef.current = false;
     setShowTerminal(false);
     cancelAnimationFrame(frameRef.current);
@@ -363,9 +347,12 @@ export default function Home() {
     }
 
     cameraZoomedRef.current = true;
-    isZoomedRef.current = true;
-    setShowTerminal(true);
-    trackScreen();
+    openTimerRef.current = window.setTimeout(() => {
+      if (!cameraZoomedRef.current) return;
+      isZoomedRef.current = true;
+      setShowTerminal(true);
+      trackScreen();
+    }, 1500);
   }
 
   const bootDone = isMobile === true ? minElapsed : minElapsed && sceneReady;
@@ -386,7 +373,7 @@ export default function Home() {
               onLoad={(spline) => {
                 const app = spline as SplineApp;
                 splineRef.current = app;
-                disableSceneZoom(app);
+                disableManualCameraZoom(app);
                 app._renderer?.pipeline?.setWatermark?.(null);
                 app.requestRender();
                 setSceneReady(true);
