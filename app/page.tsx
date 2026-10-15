@@ -36,7 +36,32 @@ type SplineApp = Application & {
   };
   _scene?: { getObjectByName: (name: string) => SceneMesh | undefined };
   _renderer?: { pipeline?: { setWatermark?: (texture: null) => void } };
+  _controls?: { orbitControls?: { enableZoom?: boolean } };
+  _eventManager?: {
+    handlers?: {
+      Basic?: {
+        eventsPerObjects?: Record<string, Record<string, Array<{ actions?: { Transition?: unknown[] } }>>>;
+      };
+    };
+  };
 };
+
+function disableSceneZoom(spline: SplineApp) {
+  const orbit = spline._controls?.orbitControls;
+  if (orbit) orbit.enableZoom = false;
+
+  const groups = spline._eventManager?.handlers?.Basic?.eventsPerObjects;
+  if (!groups) return;
+  for (const type of ['MouseDown', 'MouseUp', 'MousePress']) {
+    const byObject = groups[type];
+    if (!byObject) continue;
+    for (const events of Object.values(byObject)) {
+      for (const event of events) {
+        if (event.actions?.Transition) event.actions.Transition.length = 0;
+      }
+    }
+  }
+}
 
 function collectMeshes(object: SceneMesh | undefined) {
   const meshes: SceneMesh[] = [];
@@ -235,13 +260,35 @@ export default function Home() {
   const splineRef = useRef<SplineApp | null>(null);
   const hostRef = useRef<HTMLElement>(null);
   const frameRef = useRef(0);
-  const openTimerRef = useRef(0);
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [SplineView, setSplineView] = useState<SplineComponent | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMinElapsed(true), 700);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const blockWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) event.preventDefault();
+    };
+    const blockKeys = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key === '+' || event.key === '-' || event.key === '=' || event.key === '_' || event.key === '0') {
+        event.preventDefault();
+      }
+    };
+    const blockGesture = (event: Event) => event.preventDefault();
+    window.addEventListener('wheel', blockWheel, { passive: false });
+    window.addEventListener('keydown', blockKeys);
+    document.addEventListener('gesturestart', blockGesture);
+    document.addEventListener('gesturechange', blockGesture);
+    return () => {
+      window.removeEventListener('wheel', blockWheel);
+      window.removeEventListener('keydown', blockKeys);
+      document.removeEventListener('gesturestart', blockGesture);
+      document.removeEventListener('gesturechange', blockGesture);
+    };
   }, []);
 
   useEffect(() => {
@@ -296,13 +343,11 @@ export default function Home() {
   useEffect(
     () => () => {
       cancelAnimationFrame(frameRef.current);
-      window.clearTimeout(openTimerRef.current);
     },
     [],
   );
 
   function hideTerminal() {
-    window.clearTimeout(openTimerRef.current);
     isZoomedRef.current = false;
     setShowTerminal(false);
     cancelAnimationFrame(frameRef.current);
@@ -318,12 +363,9 @@ export default function Home() {
     }
 
     cameraZoomedRef.current = true;
-    openTimerRef.current = window.setTimeout(() => {
-      if (!cameraZoomedRef.current) return;
-      isZoomedRef.current = true;
-      setShowTerminal(true);
-      trackScreen();
-    }, 1500);
+    isZoomedRef.current = true;
+    setShowTerminal(true);
+    trackScreen();
   }
 
   const bootDone = isMobile === true ? minElapsed : minElapsed && sceneReady;
@@ -332,6 +374,7 @@ export default function Home() {
     <main
       ref={hostRef}
       className={`relative h-dvh w-full overflow-hidden ${isMobile ? 'bg-[#0a0a0a]' : 'bg-[#1A1A1A]'}`}
+      style={{ touchAction: 'pan-x pan-y' }}
     >
       {isMobile ? (
         <Terminal active onQuit={() => undefined} />
@@ -343,6 +386,7 @@ export default function Home() {
               onLoad={(spline) => {
                 const app = spline as SplineApp;
                 splineRef.current = app;
+                disableSceneZoom(app);
                 app._renderer?.pipeline?.setWatermark?.(null);
                 app.requestRender();
                 setSceneReady(true);
