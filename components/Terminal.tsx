@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import TerminalGuess from '@/components/TerminalGuess';
+import TerminalRace from '@/components/TerminalRace';
+import TerminalSnake from '@/components/TerminalSnake';
 
 const portfolioData: Record<string, string> = {
   about:
@@ -177,11 +180,38 @@ const bootSequence = [
 type LineBody =
   | { kind: 'text'; text: string }
   | { kind: 'hint' }
-  | { kind: 'command'; value: string }
+  | { kind: 'command'; value: string; prompt?: string }
   | { kind: 'help' }
+  | { kind: 'games' }
   | { kind: 'error'; command: string };
 
 type Line = LineBody & { id: number };
+
+type GameId = 'snake' | 'guess' | 'race';
+
+const gameList: { id: GameId; aliases: string[]; title: string; description: string; boot: string }[] = [
+  {
+    id: 'snake',
+    aliases: ['1', 'snake'],
+    title: 'Snake',
+    description: 'Ular klasik, panah/WASD',
+    boot: 'Memulai Snake... Panah/WASD bergerak, Q/Esc keluar.',
+  },
+  {
+    id: 'guess',
+    aliases: ['2', 'guess'],
+    title: 'Guess Number',
+    description: 'Tebak angka 1–100',
+    boot: 'Memulai Guess Number... Tebak 1–100, q/Esc keluar.',
+  },
+  {
+    id: 'race',
+    aliases: ['3', 'race'],
+    title: 'Typing Race',
+    description: 'Balapan ketik 3 round',
+    boot: 'Memulai Typing Race... 3 round, q/Esc keluar.',
+  },
+];
 
 const helpItems = [
   ['/help', 'Daftar perintah'],
@@ -189,6 +219,7 @@ const helpItems = [
   ['skills', 'Keahlian teknis'],
   ['projects', 'Daftar proyek'],
   ['contact', 'Informasi kontak'],
+  ['games', 'Daftar mini-games'],
   ['clear', 'Membersihkan layar'],
   ['/quit', 'Menutup terminal'],
 ] as const;
@@ -287,6 +318,10 @@ const terminalCss = `
 export default function Terminal({ active, onQuit }: { active: boolean; onQuit: () => void }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [ready, setReady] = useState(false);
+  const [playingSnake, setPlayingSnake] = useState(false);
+  const [playingGuess, setPlayingGuess] = useState(false);
+  const [playingRace, setPlayingRace] = useState(false);
+  const [pickingGame, setPickingGame] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
@@ -352,8 +387,10 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
   }, []);
 
   useEffect(() => {
-    if (active && ready) inputRef.current?.focus();
-  }, [active, ready]);
+    if (active && ready && !playingSnake && !playingGuess && !playingRace) {
+      inputRef.current?.focus();
+    }
+  }, [active, ready, playingSnake, playingGuess, playingRace]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -362,7 +399,49 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
     scroller.scrollTop = scroller.scrollHeight;
   }, [lines]);
 
+  function startGame(id: GameId) {
+    const game = gameList.find((item) => item.id === id);
+    if (!game) return;
+    setPickingGame(false);
+    pushLine({ kind: 'text', text: game.boot });
+    if (id === 'snake') setPlayingSnake(true);
+    if (id === 'guess') setPlayingGuess(true);
+    if (id === 'race') setPlayingRace(true);
+  }
+
+  function handleGamePick(raw: string) {
+    const choice = raw.trim().toLowerCase();
+    pushLine({ kind: 'command', value: raw, prompt: 'games>' });
+
+    if (choice === '' || choice === 'q' || choice === 'quit' || choice === '/quit') {
+      setPickingGame(false);
+      pushLine({ kind: 'text', text: 'Batal memilih game.' });
+      return;
+    }
+
+    if (choice === 'games' || choice === 'list' || choice === 'ls') {
+      pushLine({ kind: 'games' });
+      return;
+    }
+
+    const game = gameList.find((item) => item.aliases.includes(choice) || item.id === choice);
+    if (game) {
+      startGame(game.id);
+      return;
+    }
+
+    pushLine({
+      kind: 'text',
+      text: 'Pilihan tidak valid. Ketik nomor (1–3), nama game, atau q untuk batal.',
+    });
+  }
+
   function handleCommand(raw: string) {
+    if (pickingGame) {
+      handleGamePick(raw);
+      return;
+    }
+
     const command = raw.trim().toLowerCase();
     pushLine({ kind: 'command', value: raw });
 
@@ -383,6 +462,16 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
       return;
     }
 
+    if (command === 'games') {
+      pushLine({ kind: 'games' });
+      pushLine({
+        kind: 'text',
+        text: 'Pilih game: ketik nomor atau nama. q untuk batal.',
+      });
+      setPickingGame(true);
+      return;
+    }
+
     const entry = portfolioData[command];
     if (entry) {
       for (const text of entry.split('\n')) pushLine({ kind: 'text', text });
@@ -390,6 +479,74 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
     }
 
     pushLine({ kind: 'error', command });
+  }
+
+  function leaveSnake(score: number) {
+    setPlayingSnake(false);
+    pushLine({
+      kind: 'text',
+      text: score > 0 ? `Snake selesai. Skor akhir: ${score}.` : 'Keluar dari Snake.',
+    });
+  }
+
+  function leaveGuess(attempts: number, won: boolean) {
+    setPlayingGuess(false);
+    if (won) {
+      pushLine({
+        kind: 'text',
+        text: `Guess selesai. Berhasil dalam ${attempts} tebakan.`,
+      });
+      return;
+    }
+    pushLine({
+      kind: 'text',
+      text: attempts > 0 ? `Keluar dari Guess setelah ${attempts} tebakan.` : 'Keluar dari Guess.',
+    });
+  }
+
+  function leaveRace(bestWpm: number, rounds: number) {
+    setPlayingRace(false);
+    if (rounds > 0) {
+      pushLine({
+        kind: 'text',
+        text: `Race selesai. Best ${bestWpm} WPM dari ${rounds} round.`,
+      });
+      return;
+    }
+    pushLine({ kind: 'text', text: 'Keluar dari Typing Race.' });
+  }
+
+  if (playingSnake) {
+    return (
+      <div ref={scrollerRef} className="terminal-screen">
+        <style href="terminal-screen" precedence="default">
+          {terminalCss}
+        </style>
+        <TerminalSnake active={active && playingSnake} onQuit={leaveSnake} />
+      </div>
+    );
+  }
+
+  if (playingGuess) {
+    return (
+      <div ref={scrollerRef} className="terminal-screen">
+        <style href="terminal-screen" precedence="default">
+          {terminalCss}
+        </style>
+        <TerminalGuess active={active && playingGuess} onQuit={leaveGuess} />
+      </div>
+    );
+  }
+
+  if (playingRace) {
+    return (
+      <div ref={scrollerRef} className="terminal-screen">
+        <style href="terminal-screen" precedence="default">
+          {terminalCss}
+        </style>
+        <TerminalRace active={active && playingRace} onQuit={leaveRace} />
+      </div>
+    );
   }
 
   return (
@@ -420,7 +577,9 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
           if (line.kind === 'command') {
             return (
               <div key={line.id} className="terminal-line terminal-row">
-                <span className="terminal-prompt">visitor@arifin-portfolio:~$</span>
+                <span className="terminal-prompt">
+                  {line.prompt ?? 'visitor@arifin-portfolio:~$'}
+                </span>
                 <span className="terminal-value">{line.value}</span>
               </div>
             );
@@ -432,9 +591,24 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
                 {helpItems.map(([name, description]) => (
                   <div key={name} className="terminal-line">
                     {'  '}
-                    <span className="terminal-accent">{name.padEnd(8, ' ')}</span>
+                    <span className="terminal-accent">{name.padEnd(10, ' ')}</span>
                     {' - '}
                     {description}
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          if (line.kind === 'games') {
+            return (
+              <div key={line.id}>
+                <div className="terminal-line">Mini-games tersedia:</div>
+                {gameList.map((game, index) => (
+                  <div key={game.id} className="terminal-line">
+                    {'  '}
+                    <span className="terminal-accent">{`${index + 1}. ${game.id}`.padEnd(12, ' ')}</span>
+                    {' - '}
+                    {game.title}: {game.description}
                   </div>
                 ))}
               </div>
@@ -457,7 +631,9 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
           input.value = '';
         }}
       >
-        <span className="terminal-prompt">visitor@arifin-portfolio:~$</span>
+        <span className="terminal-prompt">
+          {pickingGame ? 'games>' : 'visitor@arifin-portfolio:~$'}
+        </span>
         <input
           ref={inputRef}
           className="terminal-field"
@@ -466,7 +642,8 @@ export default function Terminal({ active, onQuit }: { active: boolean; onQuit: 
           autoCapitalize="off"
           spellCheck={false}
           disabled={!ready}
-          aria-label="Perintah terminal"
+          aria-label={pickingGame ? 'Pilih game' : 'Perintah terminal'}
+          placeholder={pickingGame ? '1 / snake / q' : undefined}
           onFocus={() => {
             window.setTimeout(() => fitToVisibleArea.current(), 50);
             window.setTimeout(() => fitToVisibleArea.current(), 300);
