@@ -154,7 +154,6 @@ export default function TerminalRace({
   const [scores, setScores] = useState<number[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const advanceTimer = useRef(0);
   const scoresRef = useRef<number[]>([]);
   const roundRef = useRef(1);
   const usedRef = useRef<string[]>([phrase]);
@@ -190,10 +189,6 @@ export default function TerminalRace({
   }, [active, phase, round]);
 
   useEffect(() => {
-    return () => window.clearTimeout(advanceTimer.current);
-  }, []);
-
-  useEffect(() => {
     if (!active) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -209,7 +204,6 @@ export default function TerminalRace({
   }, [active, onQuit]);
 
   function startFresh() {
-    window.clearTimeout(advanceTimer.current);
     const first = pickPhrase([]);
     setRound(1);
     roundRef.current = 1;
@@ -229,10 +223,10 @@ export default function TerminalRace({
     scoresRef.current = [];
   }
 
-  function advanceAfterRound(nextScores: number[]) {
+  function advanceAfterRound() {
+    const nextScores = scoresRef.current;
     if (roundRef.current >= ROUNDS) {
       setScores(nextScores);
-      scoresRef.current = nextScores;
       setTyped('');
       setPhase('finished');
       return;
@@ -270,8 +264,8 @@ export default function TerminalRace({
     setLastWpm(wpm);
     setLastAccuracy(accuracy);
     setScores(nextScores);
+    setTyped('');
     setPhase('round-done');
-    advanceTimer.current = window.setTimeout(() => advanceAfterRound(nextScores), 900);
   }
 
   function onType(value: string) {
@@ -295,12 +289,28 @@ export default function TerminalRace({
 
   function handleCommand(raw: string) {
     const value = raw.trim().toLowerCase();
-    if (!value) return;
     if (value === 'q' || value === 'quit' || value === '/quit') {
       onQuit(bestWpm, scores.length);
       return;
     }
     if (value === 'r' || value === 'restart') startFresh();
+  }
+
+  function handleRoundDoneCommand(raw: string) {
+    const value = raw.trim().toLowerCase();
+    if (value === 'q' || value === 'quit' || value === '/quit') {
+      onQuit(bestWpm, scores.length);
+      return;
+    }
+    if (
+      value === '' ||
+      value === 'n' ||
+      value === 'next' ||
+      value === 'lanjut' ||
+      value === 'enter'
+    ) {
+      advanceAfterRound();
+    }
   }
 
   return (
@@ -340,12 +350,24 @@ export default function TerminalRace({
           })}
         </div>
         {phase === 'round-done' && (
-          <div className="race-line race-ok">
-            Round {round} selesai — {lastWpm} WPM · akurasi {lastAccuracy}%
-          </div>
-        )}
-        {phase === 'round-done' && round < ROUNDS && (
-          <div className="race-line race-muted">Round berikutnya...</div>
+          <>
+            <div className="race-line race-ok">
+              Round {round} selesai — {lastWpm} WPM · akurasi {lastAccuracy}%
+            </div>
+            <div className="race-line race-muted">
+              {round < ROUNDS ? (
+                <>
+                  Tekan <span className="race-accent">Enter</span> untuk round berikutnya, atau{' '}
+                  <span className="race-accent">q</span> keluar.
+                </>
+              ) : (
+                <>
+                  Tekan <span className="race-accent">Enter</span> untuk melihat hasil akhir, atau{' '}
+                  <span className="race-accent">q</span> keluar.
+                </>
+              )}
+            </div>
+          </>
         )}
         {phase === 'finished' && (
           <div className="race-line race-ok">
@@ -360,6 +382,11 @@ export default function TerminalRace({
         onSubmit={(event) => {
           event.preventDefault();
           if (phase === 'typing') return;
+          if (phase === 'round-done') {
+            handleRoundDoneCommand(typed);
+            setTyped('');
+            return;
+          }
           handleCommand(typed);
           setTyped('');
         }}
@@ -371,14 +398,21 @@ export default function TerminalRace({
           type="text"
           autoComplete="off"
           autoCapitalize="off"
+          autoCorrect="off"
           spellCheck={false}
-          disabled={!active || phase === 'round-done'}
+          disabled={!active}
           aria-label="Ketik teks race"
           value={typed}
-          placeholder={phase === 'finished' ? 'r / q' : 'mulai mengetik...'}
+          placeholder={
+            phase === 'round-done'
+              ? 'Enter lanjut / q'
+              : phase === 'finished'
+                ? 'r / q'
+                : 'mulai mengetik...'
+          }
           onChange={(event) => {
             if (phase === 'typing') onType(event.target.value);
-            else if (phase === 'finished') setTyped(event.target.value);
+            else setTyped(event.target.value);
           }}
         />
       </form>

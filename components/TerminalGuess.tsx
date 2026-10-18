@@ -293,13 +293,15 @@ export default function TerminalGuess({
           ref={inputRef}
           className="guess-field"
           type="text"
-          inputMode="numeric"
+          inputMode="text"
+          enterKeyHint={won ? 'done' : 'go'}
           autoComplete="off"
           autoCapitalize="off"
+          autoCorrect="off"
           spellCheck={false}
           disabled={!active}
           aria-label="Tebakan angka"
-          placeholder={won ? 'r / q' : `${MIN}–${MAX}`}
+          placeholder={won ? 'r ulang / q keluar' : `${MIN}–${MAX} · q keluar`}
         />
       </form>
     </div>
