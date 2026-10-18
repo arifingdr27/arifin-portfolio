@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 const MIN = 1;
 const MAX = 100;
 
-type GuessLine =
-  | { id: number; kind: 'system'; text: string }
-  | { id: number; kind: 'guess'; value: string }
-  | { id: number; kind: 'hint'; text: string; tone?: 'ok' | 'err' };
+type GuessLineBody =
+  | { kind: 'system'; text: string }
+  | { kind: 'guess'; value: string }
+  | { kind: 'hint'; text: string; tone?: 'ok' | 'err' };
+
+type GuessLine = GuessLineBody & { id: number };
 
 function roll(): number {
   return MIN + Math.floor(Math.random() * (MAX - MIN + 1));
@@ -151,9 +153,9 @@ export default function TerminalGuess({
     return () => window.removeEventListener('keydown', onKey);
   }, [active, onQuit]);
 
-  function push(line: Omit<GuessLine, 'id'> & { id?: number }) {
+  function push(line: GuessLineBody) {
     const id = idRef.current++;
-    setLines((current) => [...current, { ...line, id } as GuessLine]);
+    setLines((current) => [...current, { ...line, id }]);
   }
 
   function restart() {
